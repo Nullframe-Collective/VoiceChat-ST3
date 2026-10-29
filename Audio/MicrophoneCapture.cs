@@ -18,6 +18,7 @@ namespace VoiceChat.Audio
         private float _retry;
         private float _lastInput;
         private float _lastOutput;
+        private int _hangover;
         internal float Level { get; private set; }
         internal bool Transmitting { get; private set; }
         internal bool Testing { get; set; }
@@ -91,9 +92,16 @@ namespace VoiceChat.Audio
                 float rms = ReadFrame(frames);
                 Level = Math.Max(Level, Math.Clamp(rms * 5f, 0f, 1f));
 
-                // Silence is not sent.
-                if (talk && rms > 0.002f)
+                // Silence is not sent, but sending goes on for 300 ms after the last loud frame,
+                // so quiet sounds inside a word and the ends of words are not cut off.
+                if (rms > 0.002f)
                 {
+                    _hangover = 15;
+                }
+
+                if (talk && _hangover > 0)
+                {
+                    _hangover--;
                     VoiceApi.Send(_sequence++, ImaCodec.Encode(_samples));
                     Transmitting = true;
                 }
@@ -187,6 +195,7 @@ namespace VoiceChat.Audio
 
             _input = null;
             _lastInput = _lastOutput = 0f;
+            _hangover = 0;
         }
 
         public void Dispose() => Stop();
